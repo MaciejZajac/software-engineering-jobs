@@ -2,6 +2,7 @@ import React from 'react'
 import { JobCard } from '../components/Card/Card'
 import { Job } from '@/lib/types'
 import { mockJobs } from '@/consts/mockData'
+import { CategorySelector } from '../components/CategorySelector/CategorySelector'
 
 // Simulate API fetch
 const fetchJobs = async (): Promise<Job[]> => {
@@ -18,6 +19,7 @@ type HomePageProps = {
 const HomePage = ({ jobs }: HomePageProps) => {
   return (
     <div className="space-y-4">
+      <CategorySelector />
       {jobs.map((job) => (
         <JobCard
           key={job.slug}
