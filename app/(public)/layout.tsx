@@ -1,4 +1,3 @@
-import { CategorySelector } from "../components/CategorySelector/CategorySelector";
 import Footer from "../components/Footer/Footer";
 import NavigationBar from "../components/NavigationBar/NavigationBar";
 

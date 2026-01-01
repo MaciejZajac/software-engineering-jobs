@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/sheet"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
+import AuthButton from "../AuthButton/AuthButton"
+
 
 const NavigationBar = () => {
   const [isDark, setIsDark] = useState(false)
@@ -94,6 +96,9 @@ const NavigationBar = () => {
               <Moon className="h-5 w-5" />
             )}
           </Button>
+
+          <AuthButton />
+
 
           {/* Mobile Menu */}
           <Sheet>
