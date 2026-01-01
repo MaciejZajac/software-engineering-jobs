@@ -1,14 +1,27 @@
 import React from 'react'
 import Link from 'next/link'
-import { Building2, MapPin, Globe, Users, Briefcase, Edit, ExternalLink } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle, CardAction } from '@/components/ui/card'
+import { Edit, Plus } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { getCompanyInfo } from '@/lib/actions/company.actions'
+import { getCompanyJobs } from '@/lib/actions/job.actions'
+import { CompanyInfoCard } from '@/app/components/CompanyInfoCard/CompanyInfoCard'
 
 const ProfileHomepage = async () => {
   const result = await getCompanyInfo();
   const companyData = result.success && result.data ? result.data : null;
+  
+  const jobsResult = await getCompanyJobs();
+  const jobs = jobsResult.success && jobsResult.data ? jobsResult.data : [];
 
   // If no company data exists, show a message prompting to add it
   if (!companyData) {
@@ -63,94 +76,101 @@ const ProfileHomepage = async () => {
           </Link>
         </div>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-start gap-6">
-              {companyData.logoUrl && (
-                <div className="flex-shrink-0">
-                  <img
-                    src={companyData.logoUrl}
-                    alt={`${companyData.name} logo`}
-                    className="w-24 h-24 rounded-lg object-cover border"
-                  />
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <CardTitle className="text-2xl mb-2">{companyData.name}</CardTitle>
-                <div className="flex flex-wrap items-center gap-3 mt-3">
-                  {companyData.industry && (
-                    <Badge variant="secondary" className="gap-1.5">
-                      <Briefcase className="h-3 w-3" />
-                      {companyData.industry}
-                    </Badge>
-                  )}
-                  {companyData.size && (
-                    <Badge variant="secondary" className="gap-1.5">
-                      <Users className="h-3 w-3" />
-                      {companyData.size} employees
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            </div>
-          </CardHeader>
-          
-          <CardContent className="space-y-6">
-            {/* Description */}
-            {companyData.description && (
-              <div>
-                <h3 className="text-sm font-semibold text-muted-foreground mb-2">About</h3>
-                <p className="text-sm leading-relaxed">{companyData.description}</p>
-              </div>
-            )}
+        <CompanyInfoCard companyData={companyData} />
 
-            {/* Details Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
-              {companyData.location && (
-                <div className="flex items-start gap-3">
-                  <MapPin className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium">Location</p>
-                    <p className="text-sm text-muted-foreground">{companyData.location}</p>
-                  </div>
-                </div>
-              )}
+        {/* Company Job Listings section */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold">Job Listings</h2>
+            <Link href="/profile/jobs/new">
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                Add New Listing
+              </Button>
+            </Link>
+          </div>
 
-              {companyData.website && (
-                <div className="flex items-start gap-3">
-                  <Globe className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium">Website</p>
-                    <a
-                      href={companyData.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-primary hover:underline inline-flex items-center gap-1"
-                    >
-                      {companyData.website.replace(/^https?:\/\//, '')}
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </div>
-                </div>
-              )}
-
-              {companyData.slug && (
-                <div className="flex items-start gap-3">
-                  <Building2 className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium">Company URL</p>
-                    <Link 
-                      href={`/companies/${companyData.slug}`}
-                      className="text-sm text-primary hover:underline"
-                    >
-                      /companies/{companyData.slug}
-                    </Link>
-                  </div>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+          {jobs.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <p className="text-muted-foreground mb-4">
+                  No job listings yet. Create your first job posting!
+                </p>
+                <Link href="/profile/jobs/new">
+                  <Button>Create Job Listing</Button>
+                </Link>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Salary</TableHead>
+                      <TableHead>Tech Stack</TableHead>
+                      <TableHead>Posted</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {jobs.map((job) => (
+                      <TableRow key={job.slug}>
+                        <TableCell className="font-medium">
+                          {job.title}
+                        </TableCell>
+                        <TableCell>{job.location}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{job.employmentType}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          {job.salary ? (
+                            <span className="text-sm">
+                              {job.salary.currency} {job.salary.min / 1000}k–{job.salary.max / 1000}k
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {job.techStack.slice(0, 2).map((tech) => (
+                              <Badge key={tech} variant="outline" className="text-xs">
+                                {tech}
+                              </Badge>
+                            ))}
+                            {job.techStack.length > 2 && (
+                              <Badge variant="outline" className="text-xs">
+                                +{job.techStack.length - 2}
+                              </Badge>
+                            )}
+                            {job.techStack.length === 0 && (
+                              <span className="text-muted-foreground text-sm">—</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {job.postedAt}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Link href={`/profile/jobs/${job.slug}/edit`}>
+                            <Button variant="outline" size="sm" className="gap-2">
+                              <Edit className="h-3 w-3" />
+                              Edit
+                            </Button>
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
     </div>
   )
