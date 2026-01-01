@@ -17,9 +17,6 @@ const AuthButton = () => {
   const { user, isLoading } = useAuth();
   const router = useRouter();
 
-  console.log("user", user);
-  console.log("isLoading", isLoading);
-
   const handleSignOut = async () => {
     await signOut();
     router.refresh();
