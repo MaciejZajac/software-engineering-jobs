@@ -16,3 +16,14 @@ export type Job = {
   postedAt: string
 }
 
+export type Company = {
+  name: string
+  slug: string
+  logoUrl?: string
+  industry?: string
+  size?: string
+  location?: string
+  website?: string
+  description?: string
+}
+
