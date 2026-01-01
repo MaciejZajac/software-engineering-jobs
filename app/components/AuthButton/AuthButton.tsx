@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -10,48 +9,56 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-// MOCK session state
-const MOCK_USER = {
-  name: "Jane Doe",
-  email: "jane@example.com",
-  avatarUrl: "/avatars/jane.png",
-};
+import { useAuth } from "@/lib/hooks/use-auth";
+import { signOut } from "@/lib/better-auth/client";
+import { useRouter } from "next/navigation";
 
 const AuthButton = () => {
-  const [user, setUser] = useState<typeof MOCK_USER | null>(null);
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
+
+  console.log("user", user);
+  console.log("isLoading", isLoading);
+
+  const handleSignOut = async () => {
+    await signOut();
+    router.refresh();
+  };
+
+  if (isLoading) {
+    return (
+      <div className="h-9 w-9">
+        <div className="h-9 w-9 animate-pulse rounded-full bg-muted" />
+      </div>
+    );
+  }
 
   return (
-    <>
-      <div>
-        {user ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Avatar className="h-9 w-9 cursor-pointer">
-                <AvatarImage src={user.avatarUrl} alt={user.name} />
-                <AvatarFallback>{user.name.slice(0, 2)}</AvatarFallback>
-              </Avatar>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem>
-                <Link href="/profile">Profile</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  setUser(null);
-                }}
-              >
-                Sign Out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : (
-          <Link href="/sign-in">
-            <Button variant="outline">Sign In</Button>
-          </Link>
-        )}
-      </div>
-    </>
+    <div>
+      {user ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Avatar className="h-9 w-9 cursor-pointer">
+              <AvatarFallback>
+                {user.name?.slice(0, 2).toUpperCase() || "U"}
+              </AvatarFallback>
+            </Avatar>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem asChild>
+              <Link href="/profile">Profile</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleSignOut}>
+              Sign Out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : (
+        <Link href="/sign-in">
+          <Button variant="outline">Sign In</Button>
+        </Link>
+      )}
+    </div>
   );
 };
 
