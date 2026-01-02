@@ -1,26 +1,27 @@
 import React from 'react'
 import { JobCard } from '../components/Card/Card'
-import { Job } from '@/lib/types'
-import { mockJobs } from '@/consts/mockData'
 import { CategorySelector } from '../components/CategorySelector/CategorySelector'
+import { getJobListings } from '@/lib/actions/job.actions'
 
-// Simulate API fetch
-const fetchJobs = async (): Promise<Job[]> => {
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 100))
-  
-  return mockJobs
-}
+export default async function Page() {
+  const listings = await getJobListings();
 
-type HomePageProps = {
-  jobs: Job[]
-}
+  if (!listings.success || !listings.data || listings.data.length === 0) {
+    return (
+      <div className="space-y-4">
+        <CategorySelector />
+        <div className="text-center py-12 text-muted-foreground">
+          <p>No job listings available at the moment.</p>
+          <p className="text-sm mt-2">Check back later for new opportunities!</p>
+        </div>
+      </div>
+    )
+  }
 
-const HomePage = ({ jobs }: HomePageProps) => {
   return (
     <div className="space-y-4">
       <CategorySelector />
-      {jobs.map((job) => (
+      {listings.data.map((job) => (
         <JobCard
           key={job.slug}
           slug={job.slug}
@@ -35,11 +36,4 @@ const HomePage = ({ jobs }: HomePageProps) => {
       ))}
     </div>
   )
-}
-
-// Server Component that fetches data
-export default async function Page() {
-  const jobs = await fetchJobs()
-  
-  return <HomePage jobs={jobs} />
 }

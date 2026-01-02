@@ -21,12 +21,14 @@ export function JobCard({
       <Card className="transition-all hover:shadow-md hover:border-primary/40">
         <CardContent className="p-5 flex gap-4">
           {/* Company Logo */}
-          <Avatar className="h-12 w-12">
-            <AvatarImage src={company.logoUrl} alt={company.name} />
-            <AvatarFallback>
-              {company.name.slice(0, 2).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
+          {company && (
+            <Avatar className="h-12 w-12">
+              <AvatarImage src={company.logoUrl} alt={company.name} />
+              <AvatarFallback>
+                {company.name.slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+          )}
 
           {/* Job Info */}
           <div className="flex-1 space-y-2">
@@ -36,7 +38,8 @@ export function JobCard({
                   {title}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  {company.name} · {location}
+                  {company && `${company.name} · `}
+                  {location}
                 </p>
               </div>
 
@@ -50,19 +53,21 @@ export function JobCard({
             {/* Meta */}
             <div className="flex flex-wrap gap-2">
               <Badge variant="secondary">{employmentType}</Badge>
-              {techStack.slice(0, 4).map((tech) => (
+              {techStack && techStack.slice(0, 4).map((tech) => (
                 <Badge key={tech} variant="outline">
                   {tech}
                 </Badge>
               ))}
-              {techStack.length > 4 && (
+              {techStack && techStack.length > 4 && (
                 <Badge variant="outline">+{techStack.length - 4}</Badge>
               )}
             </div>
 
-            <p className="text-xs text-muted-foreground">
-              Posted {postedAt}
-            </p>
+            {postedAt && (
+              <p className="text-xs text-muted-foreground">
+                Posted {postedAt}
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>

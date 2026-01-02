@@ -16,7 +16,8 @@ import {
 } from "@/components/ui/select";
 import { X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { createJob, updateJob, type JobFormData } from "@/lib/actions/job.actions";
+import { createJob, updateJob } from "@/lib/actions/job.actions";
+import { type JobFormData } from "@/lib/validations/job.validation";
 
 const EMPLOYMENT_TYPES = [
   "Full-time",
@@ -24,6 +25,13 @@ const EMPLOYMENT_TYPES = [
   "Contract",
   "Internship",
   "Freelance",
+];
+
+const SENIORITY_LEVELS = [
+  "Junior",
+  "Mid",
+  "Senior",
+  "Principal",
 ];
 
 const CURRENCIES = ["USD", "EUR", "GBP", "CAD", "AUD"];
@@ -51,14 +59,16 @@ export function JobForm({ initialData, mode = "create" }: JobFormProps) {
       ? {
           title: initialData.title || "",
           location: initialData.location || "",
-          employmentType: initialData.employmentType || "",
+          employmentType: initialData.employmentType,
+          seniorityLevel: initialData.seniorityLevel,
           techStack: initialData.techStack || [],
           salary: initialData.salary,
         }
       : {
           title: "",
           location: "",
-          employmentType: "",
+          employmentType: undefined,
+          seniorityLevel: undefined,
           techStack: [],
           salary: undefined,
         },
@@ -70,7 +80,8 @@ export function JobForm({ initialData, mode = "create" }: JobFormProps) {
       reset({
         title: initialData.title || "",
         location: initialData.location || "",
-        employmentType: initialData.employmentType || "",
+        employmentType: initialData.employmentType,
+        seniorityLevel: initialData.seniorityLevel,
         techStack: initialData.techStack || [],
         salary: initialData.salary,
       });
@@ -176,6 +187,32 @@ export function JobForm({ initialData, mode = "create" }: JobFormProps) {
                 {EMPLOYMENT_TYPES.map((type) => (
                   <SelectItem key={type} value={type}>
                     {type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
+      </div>
+
+      {/* Seniority Level */}
+      <div className="space-y-2">
+        <Label htmlFor="seniorityLevel">
+          Seniority Level <span className="text-destructive">*</span>
+        </Label>
+        <Controller
+          name="seniorityLevel"
+          control={control}
+          rules={{ required: "Seniority level is required" }}
+          render={({ field }) => (
+            <Select onValueChange={field.onChange} value={field.value}>
+              <SelectTrigger id="seniorityLevel" className="w-full">
+                <SelectValue placeholder="Select seniority level" />
+              </SelectTrigger>
+              <SelectContent>
+                {SENIORITY_LEVELS.map((level) => (
+                  <SelectItem key={level} value={level}>
+                    {level}
                   </SelectItem>
                 ))}
               </SelectContent>

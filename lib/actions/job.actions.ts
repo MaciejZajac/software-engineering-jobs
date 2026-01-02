@@ -1,72 +1,36 @@
 "use server";
 
-import { headers } from "next/headers";
-import { auth } from "../better-auth/auth";
 import { connectToDatabase } from "@/database/mongoose";
 import Job from "@/database/models/Job";
 import Company from "@/database/models/Company";
-
-export interface JobFormData {
-  title: string;
-  location: string;
-  employmentType: string;
-  salary?: {
-    min: number;
-    max: number;
-    currency: string;
-  };
-  techStack: string[];
-}
-
-// Helper function to generate slug from title
-function generateSlug(title: string): string {
-  return title
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, "") // Remove special characters
-    .replace(/[\s_-]+/g, "-") // Replace spaces and underscores with hyphens
-    .replace(/^-+|-+$/g, ""); // Remove leading/trailing hyphens
-}
-
-// Helper function to format postedAt date
-function formatPostedAt(date: Date): string {
-  const now = new Date();
-  const diffInMs = now.getTime() - date.getTime();
-  const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
-
-  if (diffInDays === 0) {
-    return "today";
-  } else if (diffInDays === 1) {
-    return "1 day ago";
-  } else if (diffInDays < 7) {
-    return `${diffInDays} days ago`;
-  } else if (diffInDays < 30) {
-    const weeks = Math.floor(diffInDays / 7);
-    return weeks === 1 ? "1 week ago" : `${weeks} weeks ago`;
-  } else if (diffInDays < 365) {
-    const months = Math.floor(diffInDays / 30);
-    return months === 1 ? "1 month ago" : `${months} months ago`;
-  } else {
-    const years = Math.floor(diffInDays / 365);
-    return years === 1 ? "1 year ago" : `${years} years ago`;
-  }
-}
+import {
+  JobFormDataSchema,
+  SlugSchema,
+} from "../validations/job.validation";
+import {
+  formatValidationErrors,
+  generateSlug,
+  transformJobToResponse,
+} from "./job.helpers";
+import { requireAuth } from "./job.auth";
 
 // Create a new job listing
-export const createJob = async (data: JobFormData) => {
+export const createJob = async (data: unknown) => {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user?.id) {
+    // STEP 1: Validate input data first (runtime validation)
+    const validationResult = JobFormDataSchema.safeParse(data);
+    if (!validationResult.success) {
       return {
         success: false,
-        error: "Unauthorized",
+        error: `Validation failed: ${formatValidationErrors(validationResult.error)}`,
       };
     }
+    const validatedData = validationResult.data;
 
-    // Verify user has a company
+    // STEP 2: Check authentication
+    const session = await requireAuth();
+
+    // STEP 3: Verify user has a company
     await connectToDatabase();
     const company = await Company.findOne({ userId: session.user.id });
 
@@ -77,8 +41,8 @@ export const createJob = async (data: JobFormData) => {
       };
     }
 
-    // Generate slug from title
-    let slug = generateSlug(data.title);
+    // Generate slug from title (using validated data)
+    let slug = generateSlug(validatedData.title);
     let slugCounter = 1;
     const baseSlug = slug;
 
@@ -88,44 +52,36 @@ export const createJob = async (data: JobFormData) => {
       slugCounter++;
     }
 
-    // Create the job
+    // STEP 4: Create the job (using validated data)
     const job = await Job.create({
       userId: session.user.id,
-      title: data.title,
+      title: validatedData.title,
       slug,
-      location: data.location,
-      employmentType: data.employmentType,
-      salary: data.salary,
-      techStack: data.techStack || [],
+      location: validatedData.location,
+      employmentType: validatedData.employmentType,
+      seniorityLevel: validatedData.seniorityLevel,
+      salary: validatedData.salary,
+      techStack: validatedData.techStack || [],
     });
 
-    // Convert Mongoose document to plain object
+    // STEP 5: Transform and return response
     const jobObject = job.toObject();
-
     return {
       success: true,
-      data: {
-        slug: String(jobObject.slug),
-        title: String(jobObject.title),
-        location: String(jobObject.location),
-        employmentType: String(jobObject.employmentType),
-        salary: jobObject.salary
-          ? {
-              min: Number(jobObject.salary.min),
-              max: Number(jobObject.salary.max),
-              currency: String(jobObject.salary.currency),
-            }
-          : undefined,
-        techStack: Array.isArray(jobObject.techStack)
-          ? jobObject.techStack.map((t: any) => String(t))
-          : [],
-        postedAt: formatPostedAt(jobObject.createdAt as Date),
-      },
+      data: transformJobToResponse(jobObject),
     };
   } catch (error: any) {
     console.error("Error creating job:", error);
 
-    // Handle validation errors
+    // Handle authentication errors
+    if (error.message === "Unauthorized") {
+      return {
+        success: false,
+        error: "Unauthorized",
+      };
+    }
+
+    // Handle Mongoose validation errors
     if (error.name === "ValidationError") {
       return {
         success: false,
@@ -146,16 +102,8 @@ export const createJob = async (data: JobFormData) => {
 // Get all jobs for the current user's company
 export const getCompanyJobs = async () => {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user?.id) {
-      return {
-        success: false,
-        error: "Unauthorized",
-      };
-    }
+    // Check authentication
+    const session = await requireAuth();
 
     await connectToDatabase();
 
@@ -176,30 +124,27 @@ export const getCompanyJobs = async () => {
 
     return {
       success: true,
-      data: jobs.map((job) => ({
-        slug: String(job.slug),
-        title: String(job.title),
-        company: {
+      data: jobs.map((job) => {
+        const transformed = transformJobToResponse(job);
+        // Override company to only include name and logoUrl for company jobs list
+        transformed.company = {
           name: String(company.name),
           logoUrl: company.logoUrl ? String(company.logoUrl) : undefined,
-        },
-        location: String(job.location),
-        employmentType: String(job.employmentType),
-        salary: job.salary
-          ? {
-              min: Number(job.salary.min),
-              max: Number(job.salary.max),
-              currency: String(job.salary.currency),
-            }
-          : undefined,
-        techStack: Array.isArray(job.techStack)
-          ? job.techStack.map((t: any) => String(t))
-          : [],
-        postedAt: formatPostedAt(job.createdAt as Date),
-      })),
+        };
+        return transformed;
+      }),
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching company jobs:", error);
+
+    // Handle authentication errors
+    if (error.message === "Unauthorized") {
+      return {
+        success: false,
+        error: "Unauthorized",
+      };
+    }
+
     return {
       success: false,
       error: "Failed to fetch job listings",
@@ -210,16 +155,8 @@ export const getCompanyJobs = async () => {
 // Get a single job by slug (for editing - only returns if user owns it)
 export const getJobBySlug = async (slug: string) => {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user?.id) {
-      return {
-        success: false,
-        error: "Unauthorized",
-      };
-    }
+    // Check authentication
+    const session = await requireAuth();
 
     await connectToDatabase();
     const job = await Job.findOne({ slug, userId: session.user.id }).lean();
@@ -231,27 +168,26 @@ export const getJobBySlug = async (slug: string) => {
       };
     }
 
+    // For edit view, don't include company or postedAt
+    const transformed = transformJobToResponse(job);
+    delete transformed.company;
+    delete transformed.postedAt;
+
     return {
       success: true,
-      data: {
-        slug: String(job.slug),
-        title: String(job.title),
-        location: String(job.location),
-        employmentType: String(job.employmentType),
-        salary: job.salary
-          ? {
-              min: Number(job.salary.min),
-              max: Number(job.salary.max),
-              currency: String(job.salary.currency),
-            }
-          : undefined,
-        techStack: Array.isArray(job.techStack)
-          ? job.techStack.map((t: any) => String(t))
-          : [],
-      },
+      data: transformed,
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching job:", error);
+
+    // Handle authentication errors
+    if (error.message === "Unauthorized") {
+      return {
+        success: false,
+        error: "Unauthorized",
+      };
+    }
+
     return {
       success: false,
       error: "Failed to fetch job",
@@ -260,24 +196,35 @@ export const getJobBySlug = async (slug: string) => {
 };
 
 // Update an existing job listing
-export const updateJob = async (slug: string, data: JobFormData) => {
+export const updateJob = async (slug: unknown, data: unknown) => {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user?.id) {
+    // STEP 1: Validate inputs
+    const slugValidation = SlugSchema.safeParse(slug);
+    if (!slugValidation.success) {
       return {
         success: false,
-        error: "Unauthorized",
+        error: `Invalid slug: ${formatValidationErrors(slugValidation.error)}`,
       };
     }
+    const validatedSlug = slugValidation.data;
+
+    const dataValidation = JobFormDataSchema.safeParse(data);
+    if (!dataValidation.success) {
+      return {
+        success: false,
+        error: `Validation failed: ${formatValidationErrors(dataValidation.error)}`,
+      };
+    }
+    const validatedData = dataValidation.data;
+
+    // STEP 2: Check authentication
+    const session = await requireAuth();
 
     await connectToDatabase();
 
-    // Verify job exists and belongs to user
+    // STEP 3: Verify job exists and belongs to user
     const existingJob = await Job.findOne({
-      slug,
+      slug: validatedSlug,
       userId: session.user.id,
     });
 
@@ -288,15 +235,16 @@ export const updateJob = async (slug: string, data: JobFormData) => {
       };
     }
 
-    // Update the job
+    // STEP 4: Update the job (using validated data)
     const updatedJob = await Job.findOneAndUpdate(
-      { slug, userId: session.user.id },
+      { slug: validatedSlug, userId: session.user.id },
       {
-        title: data.title,
-        location: data.location,
-        employmentType: data.employmentType,
-        salary: data.salary,
-        techStack: data.techStack || [],
+        title: validatedData.title,
+        location: validatedData.location,
+        employmentType: validatedData.employmentType,
+        seniorityLevel: validatedData.seniorityLevel,
+        salary: validatedData.salary,
+        techStack: validatedData.techStack || [],
       },
       {
         new: true,
@@ -311,33 +259,24 @@ export const updateJob = async (slug: string, data: JobFormData) => {
       };
     }
 
-    // Convert Mongoose document to plain object
+    // STEP 5: Transform and return response
     const jobObject = updatedJob.toObject();
-
     return {
       success: true,
-      data: {
-        slug: String(jobObject.slug),
-        title: String(jobObject.title),
-        location: String(jobObject.location),
-        employmentType: String(jobObject.employmentType),
-        salary: jobObject.salary
-          ? {
-              min: Number(jobObject.salary.min),
-              max: Number(jobObject.salary.max),
-              currency: String(jobObject.salary.currency),
-            }
-          : undefined,
-        techStack: Array.isArray(jobObject.techStack)
-          ? jobObject.techStack.map((t: any) => String(t))
-          : [],
-        postedAt: formatPostedAt(jobObject.createdAt as Date),
-      },
+      data: transformJobToResponse(jobObject),
     };
   } catch (error: any) {
     console.error("Error updating job:", error);
 
-    // Handle validation errors
+    // Handle authentication errors
+    if (error.message === "Unauthorized") {
+      return {
+        success: false,
+        error: "Unauthorized",
+      };
+    }
+
+    // Handle Mongoose validation errors
     if (error.name === "ValidationError") {
       return {
         success: false,
@@ -355,3 +294,126 @@ export const updateJob = async (slug: string, data: JobFormData) => {
   }
 };
 
+// Get a single job by slug (public access - no authentication required)
+export const getPublicJobBySlug = async (slug: string) => {
+  try {
+    await connectToDatabase();
+    const job = await Job.findOne({ slug }).lean();
+
+    if (!job) {
+      return {
+        success: false,
+        error: "Job not found",
+      };
+    }
+
+    // Fetch company information
+    const company = await Company.findOne({ userId: job.userId }).lean();
+
+    return {
+      success: true,
+      data: transformJobToResponse(job, company),
+    };
+  } catch (error) {
+    console.error("Error fetching public job:", error);
+    return {
+      success: false,
+      error: "Failed to fetch job",
+    };
+  }
+};
+
+export const getJobListings = async () => {
+  try {
+    await connectToDatabase();
+
+    const jobs = await Job.find()
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean();
+
+    // Get all unique user IDs from jobs
+    const userIds = [...new Set(jobs.map((job) => job.userId))];
+
+    // Fetch all companies for these users
+    const companies = await Company.find({ userId: { $in: userIds } }).lean();
+
+    // Create a map of userId to company for quick lookup
+    const companyMap = new Map(
+      companies.map((company) => [company.userId, company])
+    );
+
+    return {
+      success: true,
+      count: jobs.length,
+      data: jobs.map((job) => {
+        const company = companyMap.get(job.userId);
+        // Use helper but only include basic company info for listings
+        const transformed = transformJobToResponse(job, company);
+        // Override company to only include name and logoUrl for listings
+        if (company) {
+          transformed.company = {
+            name: String(company.name),
+            logoUrl: company.logoUrl ? String(company.logoUrl) : undefined,
+          };
+        }
+        return transformed;
+      }),
+    };
+  } catch (error) {
+    console.error("Error fetching homepage jobs:", error);
+    return {
+      success: false,
+      error: "Failed to fetch job listings",
+    };
+  }
+};
+
+// Get similar jobs (exclude current job)
+export const getSimilarJobs = async (
+  currentSlug: string,
+  limit: number = 5
+) => {
+  try {
+    await connectToDatabase();
+
+    const jobs = await Job.find({ slug: { $ne: currentSlug } })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    // Get all unique user IDs from jobs
+    const userIds = [...new Set(jobs.map((job) => job.userId))];
+
+    // Fetch all companies for these users
+    const companies = await Company.find({ userId: { $in: userIds } }).lean();
+
+    // Create a map of userId to company for quick lookup
+    const companyMap = new Map(
+      companies.map((company) => [company.userId, company])
+    );
+
+    return {
+      success: true,
+      data: jobs.map((job) => {
+        const company = companyMap.get(job.userId);
+        // Use helper but only include basic company info for listings
+        const transformed = transformJobToResponse(job, company);
+        // Override company to only include name and logoUrl for listings
+        if (company) {
+          transformed.company = {
+            name: String(company.name),
+            logoUrl: company.logoUrl ? String(company.logoUrl) : undefined,
+          };
+        }
+        return transformed;
+      }),
+    };
+  } catch (error) {
+    console.error("Error fetching similar jobs:", error);
+    return {
+      success: false,
+      error: "Failed to fetch similar jobs",
+    };
+  }
+};

@@ -8,9 +8,7 @@ const Layout = async ({ children}: { children: React.ReactNode}) => {
   
     if(!user?.id) redirect("/sign-in");
 
-  return (
-    <>{}</>
-  )
+  return null
 }
 
 export default Layout

@@ -1,19 +1,20 @@
 export type Job = {
   slug: string
   title: string
-  company: {
-    name: string
-    logoUrl?: string
-  }
   location: string
   employmentType: string
+  seniorityLevel: string
   salary?: {
     min: number
     max: number
     currency: string
   }
-  techStack: string[]
-  postedAt: string
+  company?: {
+    name: string
+    logoUrl?: string
+  }
+  techStack?: string[]
+  postedAt?: string
 }
 
 export type Company = {

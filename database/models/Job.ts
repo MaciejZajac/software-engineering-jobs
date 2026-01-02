@@ -6,6 +6,7 @@ export interface IJob extends Document {
   slug: string;
   location: string;
   employmentType: string;
+  seniorityLevel: string;
   salary?: {
     min: number;
     max: number;
@@ -44,6 +45,12 @@ const JobSchema = new Schema<IJob>(
       type: String,
       required: true,
       trim: true,
+    },
+    seniorityLevel: {
+      type: String,
+      required: true,
+      trim: true,
+      enum: ["Junior", "Mid", "Senior", "Principal"],
     },
     salary: {
       min: {
